@@ -7,11 +7,8 @@
 # signed 16-bit conversion fix.
 # See THIRD_PARTY_NOTICES.md for details.
 
-from machine import Pin, I2C
 import utime
-
-I2C_SDA = 6
-I2C_SDL = 7
+import log
 
 # General Purpose Registers
 WHO_AM_I=0x00 # Device Identifier
@@ -61,14 +58,15 @@ CTRL_CMD_ON_DEMAND_CALIBRATION = 0xA2 # WCtrl9 On-Demand Calibration on gyroscop
 CTRL_CMD_APPLY_GYRO_GAINS = 0xAA # WCtrl9 Restore the saved Gyroscope gains
 
 class QMI8658(object):
-    def __init__(self,address=0X6B):
+    def __init__(self, i2c, address=0x6B):
+        """i2c: a configured machine.I2C instance (shared with the touch controller)."""
         self._address = address
-        self._bus = I2C(id=1,scl=Pin(I2C_SDL),sda=Pin(I2C_SDA),freq=100_000)
+        self._bus = i2c
         chip_id = self._read_byte(WHO_AM_I)
         self.detected = chip_id == QMI8658_CHIP_ID
         if not self.detected:
             # Keep configuring anyway: skipping Config_apply() leaves motion detection unconfigured
-            print("Warning: unexpected QMI8658 ID 0x{:02X} (expected 0x{:02X})".format(chip_id, QMI8658_CHIP_ID))
+            log.warn("unexpected QMI8658 ID 0x{:02X} (expected 0x{:02X})".format(chip_id, QMI8658_CHIP_ID))
         self.Read_Revision()
         self.Config_apply()
 
@@ -150,37 +148,42 @@ class QMI8658(object):
         start = utime.ticks_ms()
         while self._read_byte(STATUSINT) & 0b10000000 == 0:
             if utime.ticks_diff(utime.ticks_ms(), start) > timeout_ms:
-                print("Warning: CTRL9 command timed out")
+                log.warn("QMI8658 CTRL9 command timed out")
                 return False
             utime.sleep_ms(10)
-        print("Confirmation received")
+        log.debug("QMI8658: confirmation received")
         return True
 
-    def configure_motion_detection(self):
+    def configure_motion_detection(self, threshold_g=0.25, window_samples=10):
+        """Enable any-motion detection.
 
-        # 0b00000110 equals 0.2g
-        # x grams / 32 = y -> transform y in decimal
-        self._write_byte(CAL1_L,0x08)  # AnyMotionXThreshold (0.25g)
-        self._write_byte(CAL1_H,0x08)  # AnyMotionYThreshold (0.25g)
-        self._write_byte(CAL2_L,0x08)  # AnyMotionZThreshold (0.25g)
+        threshold_g: acceleration per axis that counts as motion (0.03 - 7.9 g).
+        window_samples: consecutive samples above the threshold before motion is reported.
+        """
+        # Threshold registers use the U3.5 format: value = g * 32
+        threshold = max(1, min(255, round(threshold_g * 32)))
+        window = max(1, min(255, int(window_samples)))
+
+        self._write_byte(CAL1_L,threshold)  # AnyMotionXThreshold
+        self._write_byte(CAL1_H,threshold)  # AnyMotionYThreshold
+        self._write_byte(CAL2_L,threshold)  # AnyMotionZThreshold
         self._write_byte(CAL2_H,0b00000000) # NoMotionXThreshold
         self._write_byte(CAL3_L,0b00000000) # NoMotionYThreshold
         self._write_byte(CAL3_H,0b00000000) # NoMotionZThreshold
         self._write_byte(CAL4_L,0b00000111) # MOTION_MODE_CTRL
         self._write_byte(CAL4_H,0x01)# first set of params
         self.write_ctrl9_command(CTRL_CMD_CONFIGURE_MOTION)
-        print("Configuring motion detection: Part1 sent. Waiting for confirmation...")
+        log.debug("Configuring motion detection: part 1 sent, waiting for confirmation...")
 
         # Wait for the command to be processed
         self._wait_cmd_done()
 
         # Acknowledge the command
         self.write_ctrl9_command(CTRL_CMD_ACK)
-        print("Acknowledged")
+        log.debug("QMI8658: acknowledged")
         utime.sleep_ms(10)
 
-        # 0b00100000 equals 100ms
-        self._write_byte(CAL1_L,0x0A)  # AnyMotionWindow: 10 consecutive samples above threshold
+        self._write_byte(CAL1_L,window)  # AnyMotionWindow: consecutive samples above threshold
         self._write_byte(CAL1_H,0b00100000) # NoMotionWindow
         self._write_byte(CAL2_L,0b00100000) # SigMotionWaitWindow[7:0]
         self._write_byte(CAL2_H,0b00100000) # SigMotionWaitWindow [15:8]
@@ -189,14 +192,14 @@ class QMI8658(object):
         # self._write_byte(CAL4_L,0x00000111) # MOTION_MODE_CTRL
         self._write_byte(CAL4_H,0x02)# second set of params
         self.write_ctrl9_command(CTRL_CMD_CONFIGURE_MOTION)
-        print("Configuring motion detection: Part2 sent. Waiting for confirmation...")
+        log.debug("Configuring motion detection: part 2 sent, waiting for confirmation...")
 
         # Wait for the command to be processed
         self._wait_cmd_done()
 
         # Acknowledge the command
         self.write_ctrl9_command(CTRL_CMD_ACK)
-        print("Acknowledged")
+        log.debug("QMI8658: acknowledged")
         utime.sleep_ms(10)
 
         # Enable Motion Detection. Event on INT1
@@ -207,6 +210,5 @@ class QMI8658(object):
     def is_any_motion_detected(self):
         bit_5_mask = 0b00100000
         readout = self._read_byte(STATUS1)
-        # print("Any motion readout: ", readout)
         return readout & bit_5_mask != 0
         

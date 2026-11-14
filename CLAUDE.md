@@ -15,23 +15,28 @@ MicroPython firmware for a Raspberry Pi Pico (RP2040) that monitors water level 
 | QMI8658 IMU | I2C(1) | SDA=6, SCL=7 |
 | CST816T touch | I2C(1) | SDA=6, SCL=7 (shared bus), INT=21, RST=22 |
 
+Board: Waveshare RP2040-Touch-LCD-1.28 (display, IMU and touch on-board). The ultrasonic sensor actually used is a US-015 (pin- and protocol-compatible with HC-SR04, driven by `hcsr04.py`), powered from 5 V; its ECHO output is 5 V while RP2040 GPIOs are 3.3 V only.
+
 ## Key files
 
-- **`main.py`** — Application entry point and main loop. Contains constants for water level thresholds (3–17 cm range), readout intervals (10s active / 60s inactive), and LCD timeout (180s).
+- **`config.py`** — Single user-facing configuration file: tank calibration (`DISTANCE_FULL_CM` / `DISTANCE_EMPTY_CM`), `CALIBRATION_MODE`, color thresholds, timings, wake-up options, `DEBUG`, and all pins (defaults for Waveshare RP2040-Touch-LCD-1.28). Other modules read from it; no values should be hardcoded elsewhere.
+- **`main.py`** — Entry point. Creates the shared I2C bus, initializes sensors, runs either the normal loop (`run`) or the calibration loop (`run_calibration`). `LevelView` handles incremental arc/text drawing.
+- **`log.py`** — `debug()` (only when `config.DEBUG`) and `warn()` (always).
 - **`ultrasonic_sensor.py`** | `UltrasonicSensor` class — wraps `HCSR04`, implements distance measurement with std-dev outlier rejection, converts distance to percentage water level.
 - **`hcsr04.py`** — HC-SR04 driver (external, from https://github.com/rsc1975/micropython-hcsr04). Provides `distance_mm()` and `distance_cm()`.
 - **`screen_driver.py`** — `ScreenDriver` class — configures GC9A01 display and provides arc drawing (`draw_arc_perf`), score/text rendering, and animated updates (`update_score`).
 - **`accelerometer.py`** — `QMI8658` class — IMU driver with two-stage motion detection configuration via CTRL9 protocol. Reads raw/calibrated accelerometer + gyroscope data. Motion thresholds: 0.2g any-motion, 100ms window.
 - **`touch_engine.py`** — `Touch_CST816T` class — touch controller via I2C with IRQ handler. Supports gesture modes (single click used as interaction trigger).
 - **`colors.py`** — RGB565 color definitions + `get_arc_color()` logic: red ≤10%, orange ≤25%, blue >25%.
-- **`helvetica_neue_bold_64.py`** — Font bitmap data for the percentage text display.
+- **`inter_bold_64.py`** — Bitmap font (Inter Bold, OFL-1.1) for the percentage text display, generated with `write_font_converter.py` from gc9a01_mpy.
 
 ## Architecture notes
 
 - The main loop checks motion/touch each iteration, then reads water level at intervals (10s when screen active, 60s background). New readings only render if the percentage changed.
 - Arc rendering uses incremental updates: full redraw on color change, partial arc expansion/shrink for value changes — avoids flicker.
 - Both IMU and touch share I2C(1) on pins 6/7; they are separate chip addresses (0x6B and 0x15).
-- `DEBUG_MODE = True` in main.py controls whether debug print statements from sensor modules are emitted.
+- Use `log.debug()` / `log.warn()` instead of `print()` in modules.
+- The bitmap font only contains the glyphs `1234567890%.-`; any other character drawn on the display is silently skipped.
 
 ## Deployment
 

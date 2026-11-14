@@ -7,11 +7,9 @@
 # I2C error handling.
 # See THIRD_PARTY_NOTICES.md for details.
 
-from machine import Pin, I2C, Timer
+from machine import Pin, Timer
 import time
-
-I2C_SDA = 6
-I2C_SDL = 7
+import log
 
 # Registers
 REG_GESTURE_ID=0x01
@@ -30,8 +28,9 @@ GESTURE_ID_LONG_PRESS = 0x0C
 #Touch drive
 class Touch_CST816T(object):
     #Initialize the touch chip
-    def __init__(self,address=0x15,mode=0,i2c_num=1,i2c_sda=6,i2c_scl=7,int_pin=21,rst_pin=22,LCD=None):
-        self._bus = I2C(id=i2c_num,scl=Pin(i2c_scl),sda=Pin(i2c_sda),freq=400_000) #Initialize I2C
+    def __init__(self, i2c, int_pin=21, rst_pin=22, address=0x15, mode=0):
+        """i2c: a configured machine.I2C instance (shared with the IMU)."""
+        self._bus = i2c
         self._address = address #Set slave address 
         self.int=Pin(int_pin,Pin.IN, Pin.PULL_UP)     
         self.tim = Timer()     
@@ -40,9 +39,7 @@ class Touch_CST816T(object):
         self.detected = self.WhoAmI()
         if self.detected:
             chip_name = "CST816G" if self._read_byte(0xA7) == 0xB3 else "CST816T"
-            print("Success:Detected {}.".format(chip_name))
-            Rev= self.Read_Revision()
-            print("{} Revision = {}".format(chip_name, Rev))
+            log.debug("Detected touch controller {} (revision {})".format(chip_name, self.Read_Revision()))
             self.Stop_Sleep()
             self.Mode = mode
             self.Gestures=None
@@ -51,7 +48,7 @@ class Touch_CST816T(object):
             self.X_point = self.Y_point = 0
             self.int.irq(handler=self.Int_Callback,trigger=Pin.IRQ_FALLING)
         else    :
-            print("Error: Not Detected touch chip (expected 0xB3/0xB5).")
+            log.warn("touch controller not detected (expected chip ID 0xB3/0xB5)")
       
     def _read_byte(self,cmd):
         try:
@@ -136,7 +133,6 @@ class Touch_CST816T(object):
     def is_touch_detected(self):
         # bit_5_mask = 0b00100000
         gesture = self.last_gesture
-        # print ("Gesture: ", gesture, gesture == GESTURE_ID_SINGLE_CLICK)
         self.last_gesture = None
         return gesture == GESTURE_ID_SINGLE_CLICK
 
