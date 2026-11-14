@@ -28,37 +28,46 @@ class Touch_CST816T(object):
         self.tim = Timer()     
         self.rst=Pin(rst_pin,Pin.OUT)
         self.Reset()
-        bRet=self.WhoAmI()
-        if bRet :
-            print("Success:Detected CST816T.")
+        self.detected = self.WhoAmI()
+        if self.detected:
+            chip_name = "CST816G" if self._read_byte(0xA7) == 0xB3 else "CST816T"
+            print("Success:Detected {}.".format(chip_name))
             Rev= self.Read_Revision()
-            print("CST816T Revision = {}".format(Rev))
+            print("{} Revision = {}".format(chip_name, Rev))
             self.Stop_Sleep()
+            self.Mode = mode
+            self.Gestures=None
+            self.last_gesture=None
+            self.Flag = self.Flgh =self.l = 0
+            self.X_point = self.Y_point = 0
+            self.int.irq(handler=self.Int_Callback,trigger=Pin.IRQ_FALLING)
         else    :
-            print("Error: Not Detected CST816T.")
-            return None
-        self.Mode = mode
-        self.Gestures=None
-        self.last_gesture=None
-        self.Flag = self.Flgh =self.l = 0
-        self.X_point = self.Y_point = 0
-        self.int.irq(handler=self.Int_Callback,trigger=Pin.IRQ_FALLING)
+            print("Error: Not Detected touch chip (expected 0xB3/0xB5).")
       
     def _read_byte(self,cmd):
-        rec=self._bus.readfrom_mem(int(self._address),int(cmd),1)
-        return rec[0]
-    
+        try:
+            rec = self._bus.readfrom_mem(int(self._address), int(cmd), 1)
+            return rec[0]
+        except OSError:
+            return -1
+
     def _read_block(self, reg, length=1):
-        rec=self._bus.readfrom_mem(int(self._address),int(reg),length)
-        return rec
-    
+        try:
+            rec = self._bus.readfrom_mem(int(self._address), int(reg), length)
+            return rec
+        except OSError:
+            return bytes([0] * length)
+
     def _write_byte(self,cmd,val):
-        self._bus.writeto_mem(int(self._address),int(cmd),bytes([int(val)]))
+        try:
+            self._bus.writeto_mem(int(self._address), int(cmd), bytes([int(val)]))
+        except OSError:
+            pass
 
     def WhoAmI(self):
-        if (0xB5) != self._read_byte(0xA7):
-            return False
-        return True
+        chip_id = self._read_byte(0xA7)
+        # Accept both CST816G (0xB3, WaveShare board) and CST816T (0xB5)
+        return chip_id in (0xB3, 0xB5)
     
     def Read_Revision(self):
         return self._read_byte(0xA9)

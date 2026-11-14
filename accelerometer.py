@@ -7,6 +7,7 @@ I2C_SDL = 7
 # General Purpose Registers
 WHO_AM_I=0x00 # Device Identifier
 REVISION_ID=0x01 # Device Revision
+QMI8658_CHIP_ID=0x05 # Expected WHO_AM_I value
 
 # Setup and Control Registers
 CTRL1=0x02 # SPI Interface and Sensor Enable
@@ -54,11 +55,12 @@ class QMI8658(object):
     def __init__(self,address=0X6B):
         self._address = address
         self._bus = I2C(id=1,scl=Pin(I2C_SDL),sda=Pin(I2C_SDA),freq=100_000)
-        #bRet=self.WhoAmI()
-        #if bRet :
-        #    self.Read_Revision()
-        #else    :
-        #    return None
+        chip_id = self._read_byte(WHO_AM_I)
+        self.detected = chip_id == QMI8658_CHIP_ID
+        if not self.detected:
+            # Keep configuring anyway: skipping Config_apply() leaves motion detection unconfigured
+            print("Warning: unexpected QMI8658 ID 0x{:02X} (expected 0x{:02X})".format(chip_id, QMI8658_CHIP_ID))
+        self.Read_Revision()
         self.Config_apply()
 
     def _read_byte(self,cmd):
@@ -79,7 +81,7 @@ class QMI8658(object):
         
     def WhoAmI(self):
         bRet=False
-        if (0x05) == self._read_byte(0x00):
+        if QMI8658_CHIP_ID == self._read_byte(WHO_AM_I):
             bRet = True
         return bRet
     
@@ -114,8 +116,8 @@ class QMI8658(object):
             # xyz[i]=(raw_acc_xyz[(i*2)+1]<<8)|(raw_acc_xyz[i*2])
             # xyz[i+3]=(raw_gyro_xyz[((i+3)*2)+1]<<8)|(raw_gyro_xyz[(i+3)*2])
             xyz[i] = (raw_xyz[(i*2)+1]<<8)|(raw_xyz[i*2])
-            if xyz[i] >= 32767:
-                xyz[i] = xyz[i]-65535
+            if xyz[i] > 32767:
+                xyz[i] = xyz[i]-65536
         return xyz
     
     def Read_XYZ(self):
@@ -134,13 +136,24 @@ class QMI8658(object):
     def write_ctrl9_command(self,cmd):
         self._write_byte(CTRL9,cmd)
 
+    def _wait_cmd_done(self, timeout_ms=1000):
+        # STATUSINT bit 7 = CmdDone (CTRL9 protocol)
+        start = utime.ticks_ms()
+        while self._read_byte(STATUSINT) & 0b10000000 == 0:
+            if utime.ticks_diff(utime.ticks_ms(), start) > timeout_ms:
+                print("Warning: CTRL9 command timed out")
+                return False
+            utime.sleep_ms(10)
+        print("Confirmation received")
+        return True
+
     def configure_motion_detection(self):
 
         # 0b00000110 equals 0.2g
         # x grams / 32 = y -> transform y in decimal
-        self._write_byte(CAL1_L,0b00000001) # AnyMotionXThreshold
-        self._write_byte(CAL1_H,0b00000001) # AnyMotionYThreshold
-        self._write_byte(CAL2_L,0b00000001) # AnyMotionZThreshold
+        self._write_byte(CAL1_L,0x08)  # AnyMotionXThreshold (0.25g)
+        self._write_byte(CAL1_H,0x08)  # AnyMotionYThreshold (0.25g)
+        self._write_byte(CAL2_L,0x08)  # AnyMotionZThreshold (0.25g)
         self._write_byte(CAL2_H,0b00000000) # NoMotionXThreshold
         self._write_byte(CAL3_L,0b00000000) # NoMotionYThreshold
         self._write_byte(CAL3_H,0b00000000) # NoMotionZThreshold
@@ -149,12 +162,8 @@ class QMI8658(object):
         self.write_ctrl9_command(CTRL_CMD_CONFIGURE_MOTION)
         print("Configuring motion detection: Part1 sent. Waiting for confirmation...")
 
-        bit_7_mask = 0b10000000
-
         # Wait for the command to be processed
-        while self._read_byte(STATUSINT) & bit_7_mask == 0:
-            utime.sleep_ms(10)
-        print("Confirmation received")
+        self._wait_cmd_done()
 
         # Acknowledge the command
         self.write_ctrl9_command(CTRL_CMD_ACK)
@@ -162,7 +171,7 @@ class QMI8658(object):
         utime.sleep_ms(10)
 
         # 0b00100000 equals 100ms
-        self._write_byte(CAL1_L,0b00000100) # AnyMotionWindow
+        self._write_byte(CAL1_L,0x0A)  # AnyMotionWindow: 10 consecutive samples above threshold
         self._write_byte(CAL1_H,0b00100000) # NoMotionWindow
         self._write_byte(CAL2_L,0b00100000) # SigMotionWaitWindow[7:0]
         self._write_byte(CAL2_H,0b00100000) # SigMotionWaitWindow [15:8]
@@ -174,9 +183,7 @@ class QMI8658(object):
         print("Configuring motion detection: Part2 sent. Waiting for confirmation...")
 
         # Wait for the command to be processed
-        while self._read_byte(STATUSINT) & bit_7_mask == 0:
-            utime.sleep_ms(10)
-        print("Confirmation received")
+        self._wait_cmd_done()
 
         # Acknowledge the command
         self.write_ctrl9_command(CTRL_CMD_ACK)

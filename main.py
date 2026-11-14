@@ -31,7 +31,11 @@ def main():
 
     # Initialize the touch sensor
     cst816s = Touch_CST816T()
-    # cst816s.Set_Mode(0)
+    touch_available = cst816s.detected
+    if touch_available:
+        cst816s.Set_Mode(0)
+    else:
+        print("Touch sensor not available -- using motion-only wake")
 
     # Initialize the ultrasonic sensor
     ultrasonicSensor = UltrasonicSensor(UPPER_WATER_LVL_CM, BOTTOM_WATER_LVL_CM)
@@ -45,16 +49,29 @@ def main():
 
     colors = Colors()
 
-    last_reading = 0
-    screen_last_turnedon = 0
-    last_reading_time = 0
-    is_active = False
+    def redraw(level, clear=True):
+        if clear:
+            lcd.fill_screen()
+        lcd.draw_score(center_x, center_y, level, colors.WHITE)
+        lcd.draw_arc_perf(center_x, center_y, radius, 0, math.ceil((level / 100) * 360), colors.get_arc_color(level))
+
+    last_reading = None
+    last_reading_time = None
+    # Start with the screen on so the first reading is visible after boot
+    lcd.screen_on()
+    is_active = True
+    screen_last_turnedon = utime.time()
 
     try:
         while True:
+            time.sleep_ms(250)
 
-            touched = cst816s.is_touch_detected()
-            motion = qmi8658.is_any_motion_detected()
+            touched = cst816s.is_touch_detected() if touch_available else False
+            try:
+                motion = qmi8658.is_any_motion_detected()
+            except OSError as ex:
+                print("IMU read error: ", ex)
+                motion = False
 
             if motion:
                 print("Motion detected: ", motion)
@@ -62,79 +79,57 @@ def main():
                 print("Touch detected: ", touched)
 
             if motion or touched:
-                print("Interaction detected -- Set active: ")
                 if not is_active:
-                    # Redraw the last reading arc with the new color
+                    print("Interaction detected -- Set active")
+                    # Redraw the last reading (the screen is not updated while it is off)
                     lcd.fill_screen()
-                    arc_color = colors.get_arc_color(last_reading)
-                    arc_end_angle = math.ceil((last_reading / 100) * 360)
                     lcd.screen_on()
-                    lcd.draw_score(center_x, center_y, last_reading)
-                    lcd.draw_arc_perf(center_x, center_y, radius, 0, arc_end_angle, arc_color)
+                    if last_reading is not None:
+                        redraw(last_reading, clear=False)
                     is_active = True
                 screen_last_turnedon = utime.time()
 
-            else:
-                # Turn off the screen if no motion is detected for 180 seconds
-                if utime.time() - screen_last_turnedon > LCD_NO_MOTION_TIMEOUT:
-                    lcd.screen_off()
-                    is_active = False
+            elif is_active and utime.time() - screen_last_turnedon > LCD_NO_MOTION_TIMEOUT:
+                # Turn off the screen if no interaction happened for LCD_NO_MOTION_TIMEOUT seconds
+                print("No interaction -- Set inactive")
+                lcd.screen_off()
+                is_active = False
 
             # Readout waterlvl when the screen is on every 10 seconds, otherwise every 60 seconds in the background.
-            current_time = utime.time()
-            seconds_since_last_reading = current_time - last_reading_time
-            waterlvl_readout_interval = WATERLVL_READOUT_INTERVAL_ACTIVE
-
-            # Skip if not enough time has passed since the last reading
-            if seconds_since_last_reading < waterlvl_readout_interval:        
+            waterlvl_readout_interval = WATERLVL_READOUT_INTERVAL_ACTIVE if is_active else WATERLVL_READOUT_INTERVAL_INACTIVE
+            if last_reading_time is not None and utime.time() - last_reading_time < waterlvl_readout_interval:
                 continue
 
             waterlevel_percent = ultrasonicSensor.read_waterlevel()
             last_reading_time = utime.time()
 
-            # Skip if the reading is the same as the last one
-            if waterlevel_percent == last_reading:
+            # Skip invalid readings and readings equal to the last one
+            if waterlevel_percent is None or waterlevel_percent == last_reading:
                 continue
-            
-            # Turn the screen on if it's off but a new different waterlevel has been detected
-            # if not is_active:
-            #     lcd.screen_on()
-            #     is_active = True
-            #     screen_last_turnedon = utime.time()
-            
-            # Store last reading information
-            last_reading_arc_end_angle = math.ceil((last_reading / 100) * 360)
-            arc_color_last_reading = colors.get_arc_color(last_reading) 
 
-            # Update last reading with current reading
+            previous_reading = last_reading
             last_reading = waterlevel_percent
 
-            arc_color = colors.get_arc_color(waterlevel_percent)
+            # The screen is fully redrawn on wake-up, so don't draw while it is off
+            if not is_active:
+                continue
 
+            if previous_reading is None or colors.get_arc_color(previous_reading) != colors.get_arc_color(waterlevel_percent):
+                # First reading or color change: full redraw
+                redraw(waterlevel_percent)
+                continue
+
+            last_arc_end_angle = math.ceil((previous_reading / 100) * 360)
             arc_end_angle = math.ceil((waterlevel_percent / 100) * 360)
-
-            if arc_color_last_reading != arc_color:
-                # Redraw the last reading arc with the new color
-                lcd.fill_screen()
-                lcd.draw_score(center_x, center_y, waterlevel_percent, colors.WHITE)
-                lcd.draw_arc_perf(center_x, center_y, radius, 0, arc_end_angle, arc_color)
-            elif arc_end_angle > last_reading_arc_end_angle:
+            lcd.update_score(center_x, center_y, waterlevel_percent, previous_reading, colors.WHITE)
+            if arc_end_angle > last_arc_end_angle:
                 # Expand the arc
-                # lcd.draw_rectangle(40, 60, 160, 120, colors.BLACK)
-                # lcd.draw_score(center_x, center_y, waterlevel_percent)
-                lcd.update_score(center_x, center_y, waterlevel_percent, last_reading, colors.WHITE)
-                lcd.draw_arc_perf(center_x, center_y, radius, last_reading_arc_end_angle, arc_end_angle, arc_color)
-            elif arc_end_angle < last_reading_arc_end_angle:
+                lcd.draw_arc_perf(center_x, center_y, radius, last_arc_end_angle, arc_end_angle, colors.get_arc_color(waterlevel_percent))
+            elif arc_end_angle < last_arc_end_angle:
                 # Shrink the arc
-                # lcd.draw_rectangle(40, 60, 160, 120, colors.BLACK)
-                # lcd.draw_score(center_x, center_y, waterlevel_percent)
-                lcd.update_score(center_x, center_y, waterlevel_percent, last_reading, colors.WHITE)
-                lcd.draw_arc_perf(center_x, center_y, radius, arc_end_angle, last_reading_arc_end_angle, colors.BLACK)
-
-            time.sleep_ms(250)
+                lcd.draw_arc_perf(center_x, center_y, radius, arc_end_angle, last_arc_end_angle, colors.BLACK)
     except KeyboardInterrupt:
         print("Exiting...")
-        is_active = False
         lcd.screen_off()
 
 
