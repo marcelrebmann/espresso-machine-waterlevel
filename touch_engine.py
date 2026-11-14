@@ -1,3 +1,12 @@
+# CST816T / CST816G capacitive touch controller driver.
+#
+# Based on the Waveshare RP2040-Touch-LCD-1.28 MicroPython demo code
+# (https://www.waveshare.com/wiki/RP2040-Touch-LCD-1.28), (c) Waveshare.
+# Modifications (c) 2025-2026 Marcel Rebmann, MIT License:
+# CST816G detection, graceful fallback when no chip is found,
+# I2C error handling.
+# See THIRD_PARTY_NOTICES.md for details.
+
 from machine import Pin, I2C, Timer
 import time
 

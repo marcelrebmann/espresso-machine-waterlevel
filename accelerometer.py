@@ -1,3 +1,12 @@
+# QMI8658 6-axis IMU driver with any-motion detection.
+#
+# Based on the Waveshare RP2040-Touch-LCD-1.28 MicroPython demo code
+# (https://www.waveshare.com/wiki/RP2040-Touch-LCD-1.28), (c) Waveshare.
+# Modifications (c) 2025-2026 Marcel Rebmann, MIT License:
+# motion-detection configuration, CTRL9 command timeout, chip ID check,
+# signed 16-bit conversion fix.
+# See THIRD_PARTY_NOTICES.md for details.
+
 from machine import Pin, I2C
 import utime
 

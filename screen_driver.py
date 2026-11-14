@@ -1,6 +1,6 @@
 import math
 import time
-import helvetica_neue_bold_64 as helvetica
+import inter_bold_64 as font
 from colors import Colors
 from machine import Pin, SPI
 import gc9a01
@@ -101,13 +101,13 @@ class ScreenDriver:
         text = "{0}%".format(score)
         # offset_x = tft.draw_len(meteo, text, scale) // 2
         # tft.draw(meteo, text, center_x - offset_x, center_y, Colors.WHITE, scale)
-        offset_x = self.tft.write_len(helvetica, text) // 2
-        self.tft.write(helvetica, text, center_x - offset_x, center_y - (helvetica.HEIGHT // 2), color)
+        offset_x = self.tft.write_len(font, text) // 2
+        self.tft.write(font, text, center_x - offset_x, center_y - (font.HEIGHT // 2), color)
 
     def update_score(self, center_x, center_y, new_score, last_score, color=Colors.WHITE):
         # Always clear the full width of "100%" so no old digits remain
         text = "{0}%".format(100)
-        text_length = self.tft.write_len(helvetica, text)
+        text_length = self.tft.write_len(font, text)
         offset_x = text_length // 2
-        self.draw_rectangle(center_x - offset_x, center_y - (helvetica.HEIGHT // 2), text_length, helvetica.HEIGHT, Colors.BLACK)
+        self.draw_rectangle(center_x - offset_x, center_y - (font.HEIGHT // 2), text_length, font.HEIGHT, Colors.BLACK)
         self.draw_score(center_x, center_y, new_score, color)
