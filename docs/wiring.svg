@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="460" viewBox="0 0 800 460" font-family="Helvetica, Arial, sans-serif">
+  <rect width="800" height="460" fill="#ffffff"/>
+
+  <!-- Board -->
+  <rect x="40" y="70" width="260" height="340" rx="14" fill="#1f2937"/>
+  <text x="170" y="100" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">Waveshare</text>
+  <text x="170" y="120" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">RP2040-Touch-LCD-1.28</text>
+  <circle cx="150" cy="275" r="72" fill="#0b1220" stroke="#4b5563" stroke-width="3"/>
+  <path d="M 222 275 A 72 72 0 1 1 150 203" fill="none" stroke="#03a9f4" stroke-width="9"/>
+  <text x="150" y="287" fill="#ffffff" font-size="30" font-weight="bold" text-anchor="middle">75%</text>
+
+  <!-- Board pins -->
+  <g font-size="14" fill="#ffffff" text-anchor="end">
+    <text x="286" y="160">VSYS (5 V)</text>
+    <text x="286" y="225">GP16</text>
+    <text x="286" y="295">GP17</text>
+    <text x="286" y="385">GND</text>
+  </g>
+  <g fill="#d1d5db" stroke="#111827" stroke-width="1.5">
+    <rect x="294" y="149" width="12" height="12"/>
+    <rect x="294" y="214" width="12" height="12"/>
+    <rect x="294" y="284" width="12" height="12"/>
+    <rect x="294" y="374" width="12" height="12"/>
+  </g>
+
+  <!-- Sensor -->
+  <rect x="560" y="70" width="200" height="340" rx="10" fill="#1e3a8a"/>
+  <text x="660" y="100" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">US-015</text>
+  <text x="660" y="118" fill="#bfdbfe" font-size="12" text-anchor="middle">(or HC-SR04)</text>
+  <g fill="#9ca3af" stroke="#e5e7eb" stroke-width="3">
+    <circle cx="700" cy="180" r="34"/>
+    <circle cx="700" cy="320" r="34"/>
+  </g>
+  <g fill="#4b5563">
+    <circle cx="700" cy="180" r="18"/>
+    <circle cx="700" cy="320" r="18"/>
+  </g>
+  <g font-size="14" fill="#ffffff">
+    <text x="576" y="160">VCC</text>
+    <text x="576" y="225">Trig</text>
+    <text x="576" y="295">Echo</text>
+    <text x="576" y="385">GND</text>
+  </g>
+  <g fill="#d1d5db" stroke="#111827" stroke-width="1.5">
+    <rect x="554" y="149" width="12" height="12"/>
+    <rect x="554" y="214" width="12" height="12"/>
+    <rect x="554" y="284" width="12" height="12"/>
+    <rect x="554" y="374" width="12" height="12"/>
+  </g>
+
+  <!-- Wires -->
+  <g fill="none" stroke-width="4" stroke-linecap="round">
+    <line x1="306" y1="155" x2="554" y2="155" stroke="#dc2626"/>
+    <line x1="306" y1="220" x2="554" y2="220" stroke="#16a34a"/>
+    <!-- Echo -> R1 -> node -> GP17 -->
+    <line x1="554" y1="290" x2="520" y2="290" stroke="#ca8a04"/>
+    <line x1="470" y1="290" x2="306" y2="290" stroke="#ca8a04"/>
+    <!-- node -> R2 -> GND -->
+    <line x1="420" y1="290" x2="420" y2="310" stroke="#ca8a04"/>
+    <line x1="420" y1="350" x2="420" y2="380" stroke="#111827"/>
+    <line x1="306" y1="380" x2="554" y2="380" stroke="#111827"/>
+  </g>
+
+  <!-- Resistors -->
+  <rect x="470" y="281" width="50" height="18" fill="#ffffff" stroke="#111827" stroke-width="2.5"/>
+  <text x="495" y="272" font-size="13" fill="#111827" text-anchor="middle" font-weight="bold">R1 1 kΩ</text>
+  <rect x="411" y="310" width="18" height="40" fill="#ffffff" stroke="#111827" stroke-width="2.5"/>
+  <text x="438" y="328" font-size="13" fill="#111827" font-weight="bold">R2 2 kΩ</text>
+  <text x="438" y="344" font-size="11" fill="#4b5563">(or 2.2 kΩ)</text>
+
+  <!-- Junctions -->
+  <circle cx="420" cy="290" r="5" fill="#111827"/>
+  <circle cx="420" cy="380" r="5" fill="#111827"/>
+
+  <!-- Signal labels -->
+  <g font-size="12" fill="#374151" text-anchor="middle">
+    <text x="430" y="147">5 V</text>
+    <text x="430" y="212">Trigger (3.3 V out)</text>
+    <text x="360" y="282">≈ 3.3 V</text>
+    <text x="430" y="402">GND</text>
+  </g>
+
+  <!-- Title / note -->
+  <text x="40" y="40" font-size="20" font-weight="bold" fill="#111827">Wiring</text>
+  <text x="40" y="440" font-size="13" fill="#b91c1c">The sensor outputs 5 V on Echo. RP2040 GPIOs are not 5 V tolerant — R1/R2 divide it down to ≈ 3.3 V.</text>
+</svg>
