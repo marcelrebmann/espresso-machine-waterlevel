@@ -1,10 +1,15 @@
 # Espresso Machine Water Level Indicator
 
+**English** | [Deutsch](README.de.md)
+
 A small add-on that measures the water level in the tank of an espresso machine with an ultrasonic sensor and shows it on a round touch display as a colored ring.
 
 Originally built for a **Quick Mill Rubino**, but it works with any machine that has a top-loading water tank — you only need to enter two distances for your tank.
 
-![Water level indicator mounted on the machine](docs/images/device.jpg)
+<p align="center">
+  <img src="docs/images/device.jpeg" alt="Display showing 62 % next to the espresso machine" width="320">
+  <img src="docs/images/sensor.jpeg" alt="Ultrasonic sensor mounted on a bracket above the water tank" width="320">
+</p>
 
 ## Features
 
@@ -23,7 +28,7 @@ Originally built for a **Quick Mill Rubino**, but it works with any machine that
 | Ultrasonic sensor **US-015** (used here) or **HC-SR04** | Same pinout and protocol, powered from 5 V |
 | 2 resistors: **1 kΩ** and **2 kΩ** (or 2.2 kΩ) | Voltage divider for the Echo signal — **required**, see below |
 | Wires, USB-C cable / 5 V supply | |
-| Optional: enclosure / mount | |
+| Bracket to hold the sensor above the tank opening | e.g. 3D-printed or bent plastic |
 
 > **3.3 V alternative:** HC-SR04P or RCWL-1601 modules run on 3.3 V. Power them from 3V3 instead of VSYS and connect Echo directly — no divider needed.
 
@@ -80,7 +85,7 @@ The level is calculated from two distances, both measured from the **front of th
 
 ### Calibration step by step
 
-1. Mount the sensor in the tank lid, facing straight down, with a clear path to the water (away from walls, hoses and the inlet).
+1. Mount the sensor above the tank opening (e.g. with a bracket across the tank, see photo above), facing straight down, with a clear path to the water (away from walls, hoses and the inlet).
 2. In [`config.py`](config.py) set `CALIBRATION_MODE = True` and upload the code.
 3. The display now shows the measured distance in cm (e.g. `12.4`).
 4. Fill the tank to your "full" level → note the value as `DISTANCE_FULL_CM`.
@@ -133,7 +138,7 @@ Set `DEBUG = True` and open the serial console (e.g. `mpremote repl`) for detail
 
 ## Disclaimer
 
-This is a hobby project. Espresso machines combine water, heat and mains voltage. Only install the sensor in places that are safe — e.g. in the removable tank lid, never inside the machine housing — and keep all electronics away from water and hot parts. You do this at your own risk; the authors accept no liability for damage to your machine or anything else.
+This is a hobby project. Espresso machines combine water, heat and mains voltage. Only mount the sensor at the water tank, never near the boiler, heating elements or mains wiring, and keep all electronics away from water and hot parts. Unplug the machine before working on it. You do this at your own risk; the authors accept no liability for damage to your machine or anything else.
 
 Quick Mill and Rubino are trademarks of their respective owner. This project is not affiliated with or endorsed by Quick Mill.
 
